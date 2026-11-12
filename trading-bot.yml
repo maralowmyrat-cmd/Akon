@@ -1,0 +1,48 @@
+name: Kraken Trading Bot
+
+on:
+  schedule:
+    # Runs every 15 minutes. GitHub may delay this by a few minutes
+    # during busy periods — fine for a 15m/1h strategy, not for
+    # fast scalping. Adjust to match your TIMEFRAME below.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}   # lets you also trigger it manually from the Actions tab
+
+permissions:
+  contents: write   # needed so the workflow can commit the updated state file
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install ccxt
+
+      - name: Run bot
+        env:
+          KRAKEN_API_KEY: ${{ secrets.KRAKEN_API_KEY }}
+          KRAKEN_API_SECRET: ${{ secrets.KRAKEN_API_SECRET }}
+          SYMBOL: "BTC/USD"
+          TIMEFRAME: "15m"
+          SHORT_MA: "9"
+          LONG_MA: "21"
+          RISK_PER_TRADE_PCT: "2"
+          STOP_LOSS_PCT: "3"
+          DRY_RUN: "True"   # change to "False" only when you're ready for real trades
+        run: python kraken_bot_github.py
+
+      - name: Save bot state back to the repo
+        run: |
+          git config user.name "trading-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add bot_state.json
+          git diff --staged --quiet || git commit -m "Update bot state [skip ci]"
+          git push
